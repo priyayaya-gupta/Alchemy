@@ -9,19 +9,22 @@ import java.util.stream.Collectors;
 @Service
 public class RetrievalService {
 
-    private final List<String> chunks = new ArrayList<>();
+    private final EmbeddingService embeddingService;
+    private final QdrantService qdrantService;
 
-    public void saveChunks(List<String> newChunks) {
-        chunks.clear();
-        chunks.addAll(newChunks);
+    public RetrievalService(
+            EmbeddingService embeddingService,
+            QdrantService qdrantService) {
+
+        this.embeddingService = embeddingService;
+        this.qdrantService = qdrantService;
     }
 
     public List<String> retrieve(String question) {
 
-        return chunks.stream()
-                .filter(chunk ->
-                        chunk.toLowerCase().contains(question.toLowerCase()))
-                .limit(3)
-                .collect(Collectors.toList());
+        List<Double> queryVector =
+                embeddingService.embed(question);
+
+        return qdrantService.search(queryVector);
     }
 }
