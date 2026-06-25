@@ -1,25 +1,68 @@
 package com.example.alchemy.Service;
 
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-// question leta hai pdf se answer nikalta hai aur redis cache use karke fast bana deta h
+
+import java.util.List;
 
 @Service
 public class RAGService {
-    //redis mai bucket banega query cache , redis key-->question har user ka
-    @Cacheable(value = "query-cache", key = "#question")
+
+    private final RetrievalService retrievalService;
+    private final LlmService llmService;
+    private final CacheService cacheService;
+    private final EmbeddingService embeddingService;
+
+    public RAGService(RetrievalService retrievalService,
+            LlmService llmService,
+            CacheService cacheService,
+            EmbeddingService embeddingService) {
+        this.retrievalService = retrievalService;
+        this.llmService = llmService;
+        this.cacheService = cacheService;
+        this.embeddingService = embeddingService;
+    }
+
     public String getAnswer(String question) {
 
-        System.out.println("Cache MISS → running RAG pipeline");
+        List<Double> questionVector = embeddingService.embed(question);
 
-        // Step 1: embedding
-        // Step 2: Qdrant search
-        // Step 3: LLM call
+        String cachedAnswer = cacheService.findSimilarCachedAnswer(questionVector);
 
-        return "Answer from PDF via RAG pipeline";
+        if (cachedAnswer != null) {
+            return cachedAnswer;
+        }
+
+        String retrievalQuery = buildRetrievalQuery(question);
+
+        List<String> contextList = retrievalService.retrieve(retrievalQuery);
+
+        if (contextList == null || contextList.isEmpty()) {
+            return "I could not find relevant content in the uploaded document.";
+        }
+
+        String context = String.join("\n\n", contextList);
+
+        String answer = llmService.generateAnswer(question, context);
+
+        cacheService.saveSemanticCache(question, questionVector, answer);
+
+        return answer;
     }
-    private String generateAnswer(String question) {
-        // your existing logic
-        return "final answer from RAG";
+
+    private String buildRetrievalQuery(String question) {
+
+        String q = question.toLowerCase();
+
+        if (q.contains("summarize") ||
+                q.contains("summarise") ||
+                q.contains("summary") ||
+                q.contains("overview") ||
+                q.contains("main points") ||
+                q.contains("key points")) {
+
+            return "main topic key points overview important information conclusion";
+        }
+
+        return question;
     }
 }

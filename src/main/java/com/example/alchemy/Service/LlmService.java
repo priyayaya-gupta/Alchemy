@@ -15,18 +15,24 @@ public class LlmService {
     public String generateAnswer(String question, String context) {
 
         String prompt = """
-                You are a helpful assistant.
+                You are a helpful document assistant for a RAG-based PDF question answering system.
 
-                Answer ONLY from the provided context.
-                If the answer is not present in the context, say:
-                "I could not find that information in the uploaded documents."
+                Your job:
+                - Answer using the provided document context.
+                - If the user asks for a summary, summarize the given context clearly.
+                - If the context contains partial information, still provide the best possible answer from it.
+                - Do not say "I don't know" unless the context is empty or completely unrelated.
+                - Do not use outside knowledge unless the user asks for a general explanation.
+                - Keep the answer simple, structured, and easy to understand.
 
-                Context:
+                User question:
                 %s
 
-                Question:
+                Document context:
                 %s
-                """.formatted(context, question);
+
+                Answer:
+                """.formatted(question, context);
 
         return chatClient.prompt()
                 .user(prompt)
