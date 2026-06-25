@@ -1,0 +1,92 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+}
+
+.app {
+    display: flex;
+    height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 25%;
+    background: white;
+    padding: 20px;
+    border-right: 1px solid #ddd;
+}
+
+.sidebar button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    cursor: pointer;
+    background: #2d6cdf;
+    color: white;
+    border: none;
+    border-radius: 6px;
+}
+
+.status {
+    margin-top: 10px;
+    font-size: 14px;
+    color: green;
+}
+
+/* Chat */
+.chat {
+    width: 75%;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.chat-box {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    border: 1px solid #ddd;
+}
+
+/* Messages */
+.msg {
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 8px;
+    max-width: 70%;
+}
+
+.user {
+    background: #dfe6e9;
+    margin-left: auto;
+    text-align: right;
+}
+
+.bot {
+    background: #dff9fb;
+}
+
+/* Input */
+.input-area {
+    display: flex;
+    margin-top: 10px;
+}
+
+.input-area input {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+.input-area button {
+    margin-left: 10px;
+    padding: 12px 20px;
+    background: #2d6cdf;
+    color: white;
+    border: none;
+    border-radius: 6px;
+}
