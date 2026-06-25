@@ -53,6 +53,7 @@ public class FileProcessingService {
         log.info(" TOTAL CHUNKS: {}", chunks.size());
 
         AtomicInteger chunkCounter = new AtomicInteger(1);
+        int id = new java.util.Random().nextInt(100000000) + 1;
 
         // 4. Embedding + Qdrant storage
         for (String chunk : chunks) {
@@ -74,7 +75,9 @@ public class FileProcessingService {
             qdrantService.store(
                     String.valueOf(id),
                     vector,
-                    chunk
+                    chunk,
+                    documentId,
+                    fileName
             );
 
             log.info("STORED IN QDRANT: {}", id);

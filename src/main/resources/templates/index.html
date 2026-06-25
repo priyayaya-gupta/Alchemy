@@ -1,40 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>ReadIt AI</title>
-    <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alchemy - AI Knowledge Assistant</title>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <span class="brand-icon">🧪</span>
+                    <h1>Alchemy</h1>
+                </div>
+                <p class="brand-tagline">AI PDF Knowledge Assistant</p>
+            </div>
 
-<div class="app">
+            <!-- Upload Zone -->
+            <div class="upload-section">
+                <div class="upload-card" id="dropZone">
+                    <input type="file" id="fileInput" accept=".pdf,.txt,.doc,.docx" multiple style="display: none;">
+                    <div class="upload-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <p class="upload-text">Drag & drop files here or <span class="browse-link" onclick="document.getElementById('fileInput').click()">browse</span></p>
+                </div>
+                <div class="status-message" id="uploadStatus"></div>
+            </div>
 
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <h2>📁 Documents</h2>
+            <!-- File List Section -->
+            <div class="documents-section">
+                <div class="section-title">
+                    <span>📁 Uploaded Documents</span>
+                    <span class="doc-count" id="docCount">0</span>
+                </div>
+                <div class="file-list-container">
+                    <ul id="fileList" class="file-list">
+                        <!-- Dynamic file list items -->
+                    </ul>
+                </div>
+            </div>
+        </aside>
 
-        <input type="file" id="fileInput" />
-        <button onclick="uploadPDF()">Upload PDF</button>
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <header class="chat-header">
+                <div class="active-doc-info">
+                    <span class="active-doc-icon">🤖</span>
+                    <div>
+                        <h2>Chat Assistant</h2>
+                        <p class="active-doc-status" id="activeDocStatus">Ready to answer questions from your documents</p>
+                    </div>
+                </div>
+            </header>
 
-        <div class="status" id="uploadStatus"></div>
+            <!-- Chat Message Box -->
+            <div class="chat-box" id="chatBox">
+                <!-- Empty State -->
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon">💬</div>
+                    <h3>Start a Conversation</h3>
+                    <p>Upload files in the sidebar and ask questions. The AI will scan your documents to retrieve the exact context and formulate answers.</p>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <footer class="chat-input-container">
+                <div class="input-wrapper">
+                    <input type="text" id="questionInput" placeholder="Ask a question about your documents..." autocomplete="off">
+                    <button class="send-btn" id="sendBtn" onclick="askQuestion()" title="Send message">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                </div>
+            </footer>
+        </main>
     </div>
 
-    <!-- Chat Section -->
-    <div class="chat">
-
-        <div id="chatBox" class="chat-box"></div>
-
-        <div class="input-area">
-            <input type="text" id="questionInput" placeholder="Ask something from PDF..." />
-            <button onclick="askQuestion()">Send</button>
-        </div>
-
-    </div>
-
-</div>
-
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
 
