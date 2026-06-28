@@ -2,23 +2,32 @@ package com.example.alchemy.Service;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.connection.RedisConnection;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.commands.ProtocolCommand;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class CacheService {
 
-    private final StringRedisTemplate redisTemplate;
+    private JedisPool jedisPool;
 
     private static final String INDEX_NAME = "alchemy_semantic_idx";
-    private static final String KEY_PREFIX = "alchemy:semantic:";
+    private static final String CACHE_PREFIX = "alchemy:semantic:";
+    private static final String ADMISSION_PREFIX = "alchemy:admission:";
+
+    @Value("${spring.data.redis.host:localhost}")
+    private String redisHost;
+
+    @Value("${spring.data.redis.port:6379}")
+    private int redisPort;
 
     @Value("${app.cache.ttl-days}")
     private long ttlDays;
@@ -29,86 +38,130 @@ public class CacheService {
     @Value("${app.cache.vector-dimension}")
     private int vectorDimension;
 
-    public CacheService(StringRedisTemplate redisTemplate) {
-        this.redisTemplate = redisTemplate;
-    }
+    @Value("${app.cache.admission-threshold}")
+    private int admissionThreshold;
 
     @PostConstruct
+    public void init() {
+        this.jedisPool = new JedisPool(redisHost, redisPort);
+        createVectorIndex();
+    }
+
     public void createVectorIndex() {
-        try {
-            redisTemplate.execute((RedisConnection connection) -> {
-                connection.execute(
-                        "FT.CREATE",
-                        INDEX_NAME.getBytes(),
-                        "ON".getBytes(), "HASH".getBytes(),
-                        "PREFIX".getBytes(), "1".getBytes(), KEY_PREFIX.getBytes(),
-                        "SCHEMA".getBytes(),
-                        "question".getBytes(), "TEXT".getBytes(),
-                        "answer".getBytes(), "TEXT".getBytes(),
-                        "embedding".getBytes(), "VECTOR".getBytes(),
-                        "HNSW".getBytes(), "6".getBytes(),
-                        "TYPE".getBytes(), "FLOAT32".getBytes(),
-                        "DIM".getBytes(), String.valueOf(vectorDimension).getBytes(),
-                        "DISTANCE_METRIC".getBytes(), "COSINE".getBytes());
-                return null;
-            });
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.sendCommand(
+                    RedisSearchCommand.FT_CREATE,
+                    bytes(INDEX_NAME),
+                    bytes("ON"), bytes("HASH"),
+                    bytes("PREFIX"), bytes("1"), bytes(CACHE_PREFIX),
+                    bytes("SCHEMA"),
+                    bytes("question"), bytes("TEXT"),
+                    bytes("answer"), bytes("TEXT"),
+                    bytes("embedding"), bytes("VECTOR"),
+                    bytes("HNSW"), bytes("6"),
+                    bytes("TYPE"), bytes("FLOAT32"),
+                    bytes("DIM"), bytes(String.valueOf(vectorDimension)),
+                    bytes("DISTANCE_METRIC"), bytes("COSINE"));
 
             System.out.println("Redis vector index created");
 
         } catch (Exception e) {
-            System.out.println("Redis vector index already exists or creation skipped");
+            System.out.println("Redis vector index already exists or skipped");
         }
     }
 
     public String findSimilarCachedAnswer(List<Double> questionVector) {
+        if (!isValidVector(questionVector)) {
+            return null;
+        }
 
-        byte[] vectorBytes = convertToFloat32Bytes(questionVector);
+        try (Jedis jedis = jedisPool.getResource()) {
+            Object result = jedis.sendCommand(
+                    RedisSearchCommand.FT_SEARCH,
+                    bytes(INDEX_NAME),
+                    bytes("*=>[KNN 1 @embedding $vec AS score]"),
+                    bytes("PARAMS"), bytes("2"),
+                    bytes("vec"), convertToFloat32Bytes(questionVector),
+                    bytes("SORTBY"), bytes("score"),
+                    bytes("RETURN"), bytes("2"),
+                    bytes("answer"), bytes("score"),
+                    bytes("DIALECT"), bytes("2"));
 
-        Object result = redisTemplate.execute((RedisConnection connection) -> connection.execute(
-                "FT.SEARCH",
-                INDEX_NAME.getBytes(),
-                "*=>[KNN 1 @embedding $vec AS score]".getBytes(),
-                "PARAMS".getBytes(), "2".getBytes(),
-                "vec".getBytes(), vectorBytes,
-                "SORTBY".getBytes(), "score".getBytes(),
-                "RETURN".getBytes(), "2".getBytes(),
-                "answer".getBytes(), "score".getBytes(),
-                "DIALECT".getBytes(), "2".getBytes()));
+            return extractAnswerIfSimilar(result);
 
-        return extractAnswerIfSimilar(result);
+        } catch (Exception e) {
+            System.out.println("Redis vector cache skipped: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public boolean shouldCacheNow(String question) {
+        String normalized = normalize(question);
+        String key = ADMISSION_PREFIX + normalized;
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            long count = jedis.incr(key);
+            jedis.expire(key, ttlDays * 24 * 60 * 60);
+
+            System.out.println("Admission count for question = " + count);
+
+            return count >= admissionThreshold;
+
+        } catch (Exception e) {
+            System.out.println("Admission check failed: " + e.getMessage());
+            return true;
+        }
     }
 
     public void saveSemanticCache(String question,
             List<Double> questionVector,
             String answer) {
 
-        String key = KEY_PREFIX + UUID.randomUUID();
+        if (!isValidVector(questionVector)) {
+            System.out.println("Cache not saved: invalid vector");
+            return;
+        }
 
-        byte[] vectorBytes = convertToFloat32Bytes(questionVector);
+        String key = CACHE_PREFIX + UUID.randomUUID();
 
-        redisTemplate.execute((RedisConnection connection) -> {
-            byte[] redisKey = key.getBytes();
+        try (Jedis jedis = jedisPool.getResource()) {
+            jedis.hset(bytes(key), bytes("question"), bytes(question));
+            jedis.hset(bytes(key), bytes("answer"), bytes(answer));
+            jedis.hset(bytes(key), bytes("embedding"), convertToFloat32Bytes(questionVector));
+            jedis.expire(bytes(key), ttlDays * 24 * 60 * 60);
 
-            connection.hSet(redisKey, "question".getBytes(), question.getBytes());
-            connection.hSet(redisKey, "answer".getBytes(), answer.getBytes());
-            connection.hSet(redisKey, "embedding".getBytes(), vectorBytes);
+            System.out.println("Saved answer in Redis semantic cache");
 
-            connection.expire(redisKey, Duration.ofDays(ttlDays).toSeconds());
-
-            return null;
-        });
-    }
-
-    public void clearRagCache() {
-        var keys = redisTemplate.keys(KEY_PREFIX + "*");
-
-        if (keys != null && !keys.isEmpty()) {
-            redisTemplate.delete(keys);
+        } catch (Exception e) {
+            System.out.println("Could not save semantic cache: " + e.getMessage());
         }
     }
 
-    private byte[] convertToFloat32Bytes(List<Double> vector) {
+    public void clearRagCache() {
+        try (Jedis jedis = jedisPool.getResource()) {
+            Set<String> cacheKeys = jedis.keys(CACHE_PREFIX + "*");
+            Set<String> admissionKeys = jedis.keys(ADMISSION_PREFIX + "*");
 
+            if (!cacheKeys.isEmpty()) {
+                jedis.del(cacheKeys.toArray(new String[0]));
+            }
+
+            if (!admissionKeys.isEmpty()) {
+                jedis.del(admissionKeys.toArray(new String[0]));
+            }
+
+            System.out.println("Redis cache and admission counters cleared");
+
+        } catch (Exception e) {
+            System.out.println("Could not clear Redis cache: " + e.getMessage());
+        }
+    }
+
+    private boolean isValidVector(List<Double> vector) {
+        return vector != null && vector.size() == vectorDimension;
+    }
+
+    private byte[] convertToFloat32Bytes(List<Double> vector) {
         ByteBuffer buffer = ByteBuffer
                 .allocate(vector.size() * Float.BYTES)
                 .order(ByteOrder.LITTLE_ENDIAN);
@@ -121,7 +174,6 @@ public class CacheService {
     }
 
     private String extractAnswerIfSimilar(Object result) {
-
         if (!(result instanceof List<?> list) || list.size() < 3) {
             return null;
         }
@@ -136,14 +188,14 @@ public class CacheService {
         double distance = 1.0;
 
         for (int i = 0; i < fields.size() - 1; i += 2) {
-            String field = new String((byte[]) fields.get(i));
-            String value = new String((byte[]) fields.get(i + 1));
+            String field = toStringValue(fields.get(i));
+            String value = toStringValue(fields.get(i + 1));
 
-            if (field.equals("answer")) {
+            if ("answer".equals(field)) {
                 answer = value;
             }
 
-            if (field.equals("score")) {
+            if ("score".equals(field)) {
                 distance = Double.parseDouble(value);
             }
         }
@@ -157,5 +209,40 @@ public class CacheService {
 
         System.out.println("Redis VECTOR MISS, similarity = " + similarity);
         return null;
+    }
+
+    private String normalize(String question) {
+        return question
+                .trim()
+                .toLowerCase()
+                .replaceAll("[^a-z0-9\\s]", "")
+                .replaceAll("\\s+", " ");
+    }
+
+    private String toStringValue(Object value) {
+        if (value instanceof byte[] bytes) {
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
+        return String.valueOf(value);
+    }
+
+    private byte[] bytes(String value) {
+        return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private enum RedisSearchCommand implements ProtocolCommand {
+        FT_CREATE("FT.CREATE"),
+        FT_SEARCH("FT.SEARCH");
+
+        private final byte[] raw;
+
+        RedisSearchCommand(String command) {
+            this.raw = command.getBytes(StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public byte[] getRaw() {
+            return raw;
+        }
     }
 }

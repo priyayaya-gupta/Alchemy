@@ -24,6 +24,10 @@ public class RAGService {
 
     public String getAnswer(String question) {
 
+        if (question == null || question.trim().isEmpty()) {
+            return "Question cannot be empty.";
+        }
+
         List<Double> questionVector = embeddingService.embed(question);
 
         String cachedAnswer = cacheService.findSimilarCachedAnswer(questionVector);
@@ -44,7 +48,11 @@ public class RAGService {
 
         String answer = llmService.generateAnswer(question, context);
 
-        cacheService.saveSemanticCache(question, questionVector, answer);
+        if (cacheService.shouldCacheNow(question)) {
+            cacheService.saveSemanticCache(question, questionVector, answer);
+        } else {
+            System.out.println("Answer not cached yet. Waiting for repeated question.");
+        }
 
         return answer;
     }
