@@ -1,6 +1,9 @@
 package com.example.alchemy.Service;
 
+import com.example.alchemy.dto.FileInfo;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -9,6 +12,8 @@ import java.util.*;
 
 @Service
 public class QdrantService {
+
+        private static final Logger logger = LoggerFactory.getLogger(QdrantService.class);
 
         @Value("${qdrant.url}")
         private String baseUrl;
@@ -24,7 +29,6 @@ public class QdrantService {
         }
 
         public void createCollection() {
-
                 String url = baseUrl + "/collections/" + collection;
 
                 Map<String, Object> request = Map.of(
@@ -34,26 +38,17 @@ public class QdrantService {
 
                 try {
                         restTemplate.put(url, request);
-                        System.out.println("Collection created");
+                        logger.info("Qdrant collection created: {}", collection);
                 } catch (Exception e) {
-                        System.out.println("Collection already exists or creation failed: " + e.getMessage());
+                        logger.info("Qdrant collection already exists or creation failed: {}", e.getMessage());
                 }
         }
 
-        public void store(String id,
-                        List<Double> vector,
-                        String text,
-                        String documentId,
-                        String fileName) {
-
-                String url = baseUrl
-                                + "/collections/"
-                                + collection
-                                + "/points";
+        public void store(String id, List<Double> vector, String text, String documentId, String fileName) {
+                String url = baseUrl + "/collections/" + collection + "/points";
 
                 Map<String, Object> body = Map.of(
-                                "points",
-                                List.of(
+                                "points", List.of(
                                                 Map.of(
                                                                 "id", Integer.parseInt(id),
                                                                 "vector", vector,
@@ -65,14 +60,8 @@ public class QdrantService {
                 restTemplate.put(url, body);
         }
 
-        public List<String> search(List<Double> vector,
-                        List<String> documentIds,
-                        List<String> fileNames) {
-
-                String url = baseUrl
-                                + "/collections/"
-                                + collection
-                                + "/points/search";
+        public List<String> search(List<Double> vector, List<String> documentIds, List<String> fileNames) {
+                String url = baseUrl + "/collections/" + collection + "/points/search";
 
                 Map<String, Object> body = new HashMap<>();
                 body.put("vector", vector);
@@ -111,15 +100,41 @@ public class QdrantService {
                 }
 
                 List<Map<String, Object>> result = (List<Map<String, Object>>) response.get("result");
+                List<String> chunks = new ArrayList<>();
 
-                return result.stream()
-                                .map(point -> {
-                                        Map<String, Object> payload = (Map<String, Object>) point.get("payload");
+                int rank = 1;
 
-                                        return (String) payload.get("text");
-                                })
-                                .filter(Objects::nonNull)
-                                .toList();
+                for (Map<String, Object> point : result) {
+                        Map<String, Object> payload = (Map<String, Object>) point.get("payload");
+
+                        if (payload == null) {
+                                continue;
+                        }
+
+                        String text = (String) payload.get("text");
+                        String fileName = (String) payload.get("fileName");
+                        String documentId = (String) payload.get("documentId");
+
+                        Double score = point.get("score") != null
+                                        ? ((Number) point.get("score")).doubleValue()
+                                        : null;
+
+                        logger.info("""
+                                        ======================================
+                                        Rank       : {}
+                                        Score      : {}
+                                        FileName   : {}
+                                        DocumentId : {}
+                                        Chunk      : {}
+                                        ======================================
+                                        """, rank++, score, fileName, documentId, text);
+
+                        if (text != null) {
+                                chunks.add(text);
+                        }
+                }
+
+                return chunks;
         }
 
         public List<Map<String, String>> listDocuments() {
@@ -138,7 +153,6 @@ public class QdrantService {
                         }
 
                         Map<String, Object> result = (Map<String, Object>) response.get("result");
-
                         List<Map<String, Object>> points = (List<Map<String, Object>>) result.get("points");
 
                         if (points == null) {
@@ -175,17 +189,28 @@ public class QdrantService {
                         return list;
 
                 } catch (Exception e) {
-                        System.err.println("Error listing documents from Qdrant: " + e.getMessage());
+                        logger.error("Error listing documents from Qdrant: {}", e.getMessage());
                         return List.of();
                 }
         }
 
-        public void deleteDocument(String documentId) {
+        public List<FileInfo> getAllFiles() {
+                List<Map<String, String>> documents = listDocuments();
 
-                String url = baseUrl
-                                + "/collections/"
-                                + collection
-                                + "/points/delete";
+                List<FileInfo> files = new ArrayList<>();
+
+                for (Map<String, String> doc : documents) {
+                        files.add(
+                                        new FileInfo(
+                                                        doc.get("documentId"),
+                                                        doc.get("fileName")));
+                }
+
+                return files;
+        }
+
+        public void deleteDocument(String documentId) {
+                String url = baseUrl + "/collections/" + collection + "/points/delete";
 
                 Map<String, Object> body = Map.of(
                                 "filter", Map.of(
@@ -197,6 +222,6 @@ public class QdrantService {
 
                 restTemplate.postForObject(url, body, String.class);
 
-                System.out.println("Deleted vectors for document: " + documentId);
+                logger.info("Deleted vectors for document: {}", documentId);
         }
 }

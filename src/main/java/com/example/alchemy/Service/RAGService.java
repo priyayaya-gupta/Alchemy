@@ -77,32 +77,6 @@ public class RAGService {
     }
 
     private String buildRetrievalQuery(String question) {
-
-        String q = question.toLowerCase();
-
-        if (q.contains("disqualification") ||
-                q.contains("disqualified") ||
-                q.contains("not eligible") ||
-                q.contains("eligibility criteria")) {
-
-            return question + " disqualification criteria not eligible rejection conditions";
-        }
-
-        if (q.contains("summarize") ||
-                q.contains("summarise") ||
-                q.contains("summary") ||
-                q.contains("overview") ||
-                q.contains("main points") ||
-                q.contains("key points")) {
-
-            return "main topic key points overview important information conclusion";
-        }
-
-        return question;
-    }
-
-    private String buildRetrievalQuery(String question) {
-
         String q = question.toLowerCase();
 
         if (q.contains("disqualification") ||

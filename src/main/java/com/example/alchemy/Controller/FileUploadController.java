@@ -47,7 +47,6 @@ public class FileUploadController {
                                     "fileName", file.getOriginalFilename()));
                 }
             } catch (Exception e) {
-
                 log.error("Error uploading {}", file.getOriginalFilename(), e);
 
                 return ResponseEntity.status(500)
@@ -56,6 +55,11 @@ public class FileUploadController {
         }
 
         return ResponseEntity.ok(uploadedFiles);
+    }
+
+    @GetMapping("/files")
+    public List<Map<String, String>> getFiles() {
+        return qdrantService.listDocuments();
     }
 
     @GetMapping("/documents")

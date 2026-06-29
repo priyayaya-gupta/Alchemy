@@ -1,5 +1,7 @@
 package com.example.alchemy.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -7,6 +9,8 @@ import java.util.List;
 
 @Service
 public class ChunkingService {
+
+    private static final Logger log = LoggerFactory.getLogger(ChunkingService.class);
 
     private static final int MAX_CHUNK_SIZE = 1200;
     private static final int OVERLAP_SENTENCES = 1;
@@ -25,6 +29,24 @@ public class ChunkingService {
 
         for (String section : sections) {
             chunks.addAll(splitLargeSection(section));
+        }
+
+        log.info("Generated {} chunks.", chunks.size());
+
+        for (int i = 0; i < chunks.size(); i++) {
+
+            String chunk = chunks.get(i);
+
+            log.info("""
+                    Chunk {}
+                    Characters : {}
+                    Words      : {}
+                    Content    : {}
+                    """,
+                    i + 1,
+                    chunk.length(),
+                    chunk.split("\\s+").length,
+                    chunk);
         }
 
         return chunks;

@@ -9,8 +9,9 @@ const docCount = document.getElementById("docCount");
 const chatBox = document.getElementById("chatBox");
 const emptyState = document.getElementById("emptyState");
 const questionInput = document.getElementById("questionInput");
-
 let typingIndicator = null;
+
+
 
 // Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
@@ -122,124 +123,182 @@ async function loadFiles() {
 
 // Render File List in Sidebar
 function renderFileList(files) {
+
     fileList.innerHTML = "";
     docCount.innerText = files.length;
 
     if (files.length === 0) {
-        fileList.innerHTML = `<li style="padding: 10px; color: #64748b; font-size: 13px; text-align: center; font-style: italic;">No documents uploaded yet</li>`;
+        fileList.innerHTML = `
+            <li style="padding:10px; color:#64748b; font-size:13px; text-align:center; font-style:italic;">
+                No documents uploaded yet
+            </li>
+        `;
         return;
     }
 
     files.forEach(file => {
+
         const li = document.createElement("li");
         li.className = "file-item";
+
         li.innerHTML = `
-            <div class="file-info" title="${file.fileName}">
+            <label class="file-info" title="${file.fileName}">
+                <input
+                    type="checkbox"
+                    class="file-checkbox"
+                    value="${file.documentId}"
+                    checked
+                >
+
                 <span class="file-icon">📄</span>
                 <span class="file-name">${file.fileName}</span>
-            </div>
-            <button class="delete-btn" onclick="deleteFile('${file.documentId}', '${file.fileName}')" title="Delete document">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </label>
+
+            <button
+                class="delete-btn"
+                onclick="deleteFile('${file.documentId}','${file.fileName}')"
+                title="Delete document">
+
+                <svg width="14"
+                     height="14"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+
             </button>
         `;
+
         fileList.appendChild(li);
+
     });
+
 }
+
 
 // Delete File
-async function deleteFile(documentId, fileName) {
-    if (!confirm(`Are you sure you want to delete "${fileName}"? This will remove all associated vector data.`)) {
-        return;
-    }
+        async function deleteFile(documentId, fileName) {
+            if (!confirm(`Are you sure you want to delete "${fileName}"? This will remove all associated vector data.`)) {
+                return;
+            }
 
-    try {
-        setStatus(`Deleting ${fileName}...`, "info");
-        const res = await fetch(`${API_BASE}/files/${documentId}`, {
-            method: "DELETE"
-        });
+            try {
+                setStatus(`Deleting ${fileName}...`, "info");
+                const res = await fetch(`${API_BASE}/files/${documentId}`, {
+                    method: "DELETE"
+                });
 
-        if (!res.ok) throw new Error("Delete failed");
+                if (!res.ok) throw new Error("Delete failed");
 
-        setStatus("Deleted successfully ✅", "success");
-        loadFiles();
-    } catch (err) {
-        console.error(err);
-        setStatus("Delete failed ❌", "error");
-    }
-}
+                setStatus("Deleted successfully ✅", "success");
+                loadFiles();
+            } catch (err) {
+                console.error(err);
+                setStatus("Delete failed ❌", "error");
+            }
+        }
 
 // Add Message to Chat Box
-function addMessage(text, type) {
-    // Hide empty state on first message
-    if (emptyState) {
-        emptyState.style.display = "none";
-    }
+        function addMessage(text, type) {
+            // Hide empty state on first message
+            if (emptyState) {
+                emptyState.style.display = "none";
+            }
 
-    const div = document.createElement("div");
-    div.classList.add("msg", type);
-    div.innerText = text;
+            const div = document.createElement("div");
+            div.classList.add("msg", type);
+            div.innerText = text;
 
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
 
 // Show Bot Typing Indicator
-function showTypingIndicator() {
-    if (emptyState) {
-        emptyState.style.display = "none";
-    }
+        function showTypingIndicator() {
+            if (emptyState) {
+                emptyState.style.display = "none";
+            }
 
-    typingIndicator = document.createElement("div");
-    typingIndicator.className = "typing-indicator";
-    typingIndicator.innerHTML = `
+            typingIndicator = document.createElement("div");
+            typingIndicator.className = "typing-indicator";
+            typingIndicator.innerHTML = `
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
     `;
-    chatBox.appendChild(typingIndicator);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
+            chatBox.appendChild(typingIndicator);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
 
 // Remove Bot Typing Indicator
-function removeTypingIndicator() {
-    if (typingIndicator && typingIndicator.parentNode) {
-        typingIndicator.parentNode.removeChild(typingIndicator);
-    }
-    typingIndicator = null;
-}
+        function removeTypingIndicator() {
+            if (typingIndicator && typingIndicator.parentNode) {
+                typingIndicator.parentNode.removeChild(typingIndicator);
+            }
+            typingIndicator = null;
+        }
 
 // Ask Question to Chatbot
-async function askQuestion() {
-    const question = questionInput.value.trim();
-    if (!question) return;
+        async function askQuestion() {
 
-    // Add user message
-    addMessage(question, "user");
-    questionInput.value = "";
+            const question = questionInput.value.trim();
 
-    // Show bot thinking indicator
-    showTypingIndicator();
+            if (!question) return;
 
-    try {
-        const res = await fetch(`${API_BASE}/query`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ question })
-        });
+            // Selected files
+            const selectedDocumentIds = [];
 
-        if (!res.ok) throw new Error("Query failed");
+            document.querySelectorAll(".file-checkbox:checked")
+                .forEach(cb => {
+                    selectedDocumentIds.push(cb.value);
+                });
 
-        const data = await res.text();
-        
-        // Remove typing indicator and add response
-        removeTypingIndicator();
-        addMessage(data, "bot");
+            // Add user message
+            addMessage(question, "user");
+            questionInput.value = "";
 
-    } catch (err) {
-        console.error(err);
-        removeTypingIndicator();
-        addMessage("Error connecting to AI backend. Make sure the server and Ollama are running. ❌", "bot");
-    }
-}
+            // Show typing indicator
+            showTypingIndicator();
+
+            try {
+
+                const res = await fetch(`${API_BASE}/query`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        documentIds: selectedDocumentIds
+                    })
+                });
+
+                if (!res.ok) {
+                    throw new Error("Query failed");
+                }
+
+                const data = await res.text();
+
+                removeTypingIndicator();
+                addMessage(data, "bot");
+
+            } catch (err) {
+
+                console.error(err);
+
+                removeTypingIndicator();
+
+                addMessage(
+                    "Error connecting to AI backend. Make sure the server and Ollama are running. ❌",
+                    "bot"
+                );
+            }
+        }
