@@ -57,6 +57,7 @@ public class CacheService {
                     bytes("SCHEMA"),
                     bytes("question"), bytes("TEXT"),
                     bytes("answer"), bytes("TEXT"),
+                    bytes("scope"), bytes("TAG"),
                     bytes("embedding"), bytes("VECTOR"),
                     bytes("HNSW"), bytes("6"),
                     bytes("TYPE"), bytes("FLOAT32"),
@@ -70,16 +71,21 @@ public class CacheService {
         }
     }
 
-    public String findSimilarCachedAnswer(List<Double> questionVector) {
+    public String findSimilarCachedAnswer(List<Double> questionVector,
+            List<String> documentIds,
+            List<String> fileNames) {
+
         if (!isValidVector(questionVector)) {
             return null;
         }
+
+        String scope = buildDocumentScope(documentIds, fileNames);
 
         try (Jedis jedis = jedisPool.getResource()) {
             Object result = jedis.sendCommand(
                     RedisSearchCommand.FT_SEARCH,
                     bytes(INDEX_NAME),
-                    bytes("*=>[KNN 1 @embedding $vec AS score]"),
+                    bytes("@scope:{" + escapeTag(scope) + "}=>[KNN 1 @embedding $vec AS score]"),
                     bytes("PARAMS"), bytes("2"),
                     bytes("vec"), convertToFloat32Bytes(questionVector),
                     bytes("SORTBY"), bytes("score"),
@@ -95,9 +101,12 @@ public class CacheService {
         }
     }
 
-    public boolean shouldCacheNow(String question) {
-        String normalized = normalize(question);
-        String key = ADMISSION_PREFIX + normalized;
+    public boolean shouldCacheNow(String question,
+            List<String> documentIds,
+            List<String> fileNames) {
+
+        String scope = buildDocumentScope(documentIds, fileNames);
+        String key = ADMISSION_PREFIX + normalize(question) + ":" + scope;
 
         try (Jedis jedis = jedisPool.getResource()) {
             long count = jedis.incr(key);
@@ -115,18 +124,22 @@ public class CacheService {
 
     public void saveSemanticCache(String question,
             List<Double> questionVector,
-            String answer) {
+            String answer,
+            List<String> documentIds,
+            List<String> fileNames) {
 
         if (!isValidVector(questionVector)) {
             System.out.println("Cache not saved: invalid vector");
             return;
         }
 
+        String scope = buildDocumentScope(documentIds, fileNames);
         String key = CACHE_PREFIX + UUID.randomUUID();
 
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.hset(bytes(key), bytes("question"), bytes(question));
             jedis.hset(bytes(key), bytes("answer"), bytes(answer));
+            jedis.hset(bytes(key), bytes("scope"), bytes(scope));
             jedis.hset(bytes(key), bytes("embedding"), convertToFloat32Bytes(questionVector));
             jedis.expire(bytes(key), ttlDays * 24 * 60 * 60);
 
@@ -159,6 +172,26 @@ public class CacheService {
 
     private boolean isValidVector(List<Double> vector) {
         return vector != null && vector.size() == vectorDimension;
+    }
+
+    private String buildDocumentScope(List<String> documentIds, List<String> fileNames) {
+        if (documentIds != null && !documentIds.isEmpty()) {
+            return "docs:" + documentIds.stream().sorted().toList();
+        }
+
+        if (fileNames != null && !fileNames.isEmpty()) {
+            return "files:" + fileNames.stream().sorted().toList();
+        }
+
+        return "all-documents";
+    }
+
+    private String normalize(String question) {
+        return question
+                .trim()
+                .toLowerCase()
+                .replaceAll("[^a-z0-9\\s]", "")
+                .replaceAll("\\s+", " ");
     }
 
     private byte[] convertToFloat32Bytes(List<Double> vector) {
@@ -211,19 +244,24 @@ public class CacheService {
         return null;
     }
 
-    private String normalize(String question) {
-        return question
-                .trim()
-                .toLowerCase()
-                .replaceAll("[^a-z0-9\\s]", "")
-                .replaceAll("\\s+", " ");
-    }
-
     private String toStringValue(Object value) {
         if (value instanceof byte[] bytes) {
             return new String(bytes, StandardCharsets.UTF_8);
         }
+
         return String.valueOf(value);
+    }
+
+    private String escapeTag(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace(" ", "\\ ")
+                .replace(",", "\\,")
+                .replace(".", "\\.")
+                .replace("-", "\\-")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace(":", "\\:");
     }
 
     private byte[] bytes(String value) {

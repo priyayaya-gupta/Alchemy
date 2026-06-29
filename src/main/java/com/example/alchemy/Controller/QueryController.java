@@ -16,6 +16,10 @@ public class QueryController {
 
         @PostMapping
         public String ask(@RequestBody QuestionRequest request) {
-                return ragService.getAnswer(request.getQuestion());
+                return ragService.getAnswer(
+                                request.getQuestion(),
+                                request.getDocumentIds(),
+                                request.getFileNames(),
+                                request.getSessionId());
         }
 }
