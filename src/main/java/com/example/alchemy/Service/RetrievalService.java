@@ -20,11 +20,11 @@ public class RetrievalService {
         this.qdrantService = qdrantService;
     }
 
-    public List<String> retrieve(String question) {
+    public List<String> retrieve(String question,List <String> documentIds) {
 
         List<Double> queryVector =
                 embeddingService.embed(question);
 
-        return qdrantService.search(queryVector);
+        return qdrantService.search(queryVector, documentIds);
     }
 }

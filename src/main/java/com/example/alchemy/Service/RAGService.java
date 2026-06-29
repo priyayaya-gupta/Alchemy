@@ -22,7 +22,7 @@ public class RAGService {
         this.embeddingService = embeddingService;
     }
 
-    public String getAnswer(String question) {
+    public String getAnswer(String question,List<String> documentIds) {
 
         if (question == null || question.trim().isEmpty()) {
             return "Question cannot be empty.";
@@ -38,8 +38,8 @@ public class RAGService {
 
         String retrievalQuery = buildRetrievalQuery(question);
 
-        List<String> contextList = retrievalService.retrieve(retrievalQuery);
-
+        List<String> contextList = retrievalService.retrieve(retrievalQuery, documentIds
+                );
         if (contextList == null || contextList.isEmpty()) {
             return "I could not find relevant content in the uploaded document.";
         }

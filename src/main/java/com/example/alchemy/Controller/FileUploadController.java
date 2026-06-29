@@ -1,11 +1,15 @@
 package com.example.alchemy.Controller;
 
 import com.example.alchemy.Service.FileProcessingService;
+import com.example.alchemy.Service.QdrantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/files")
@@ -13,9 +17,10 @@ public class FileUploadController {
     private static final Logger log =
             LoggerFactory.getLogger(FileUploadController.class);
     private final FileProcessingService service;
-
-    public FileUploadController(FileProcessingService service) {
+    private final QdrantService qdrantService;
+    public FileUploadController(FileProcessingService service,QdrantService qdrantService) {
         this.service = service;
+        this.qdrantService = qdrantService;
     }
 
     @PostMapping("/upload")
@@ -41,6 +46,11 @@ public class FileUploadController {
         }
 
         return ResponseEntity.ok("Processed " + processed + " files successfully");
+    }
+    @GetMapping("/files")
+    public List<Map<String, String>> getFiles() {
+
+        return qdrantService.listDocuments();
     }
 
 }
