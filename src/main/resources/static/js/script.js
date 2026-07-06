@@ -9,16 +9,31 @@ const docCount = document.getElementById("docCount");
 const chatBox = document.getElementById("chatBox");
 const emptyState = document.getElementById("emptyState");
 const questionInput = document.getElementById("questionInput");
+
 let typingIndicator = null;
 
+// JWT token localStorage se nikaalte hain.
+// Agar token nahi hai, user ko login page pe bhej dete hain.
+function getAuthHeaders() {
+    const token = localStorage.getItem("alchemyToken");
 
+    if (!token) {
+        window.location.href = "/login.html";
+        return {};
+    }
+
+    return {
+        "Authorization": "Bearer " + token
+    };
+}
 
 // Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
-    // Load existing files
+
+    // Existing uploaded files load karna
     loadFiles();
 
-    // Drag and Drop Event Listeners
+    // Drag enter/over par upload area highlight hoga
     ["dragenter", "dragover"].forEach(eventName => {
         dropZone.addEventListener(eventName, (e) => {
             e.preventDefault();
@@ -26,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }, false);
     });
 
+    // Drag leave/drop par highlight remove hoga
     ["dragleave", "drop"].forEach(eventName => {
         dropZone.addEventListener(eventName, (e) => {
             e.preventDefault();
@@ -33,21 +49,23 @@ document.addEventListener("DOMContentLoaded", () => {
         }, false);
     });
 
+    // File drop hone par upload start
     dropZone.addEventListener("drop", (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
+        const files = e.dataTransfer.files;
+
         if (files.length > 0) {
             handleFilesSelect(files);
         }
     });
 
+    // Browse se file select hone par upload start
     fileInput.addEventListener("change", (e) => {
         if (e.target.files.length > 0) {
             handleFilesSelect(e.target.files);
         }
     });
 
-    // Enter Key in Chat Input
+    // Enter press karne par question send
     questionInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
@@ -56,12 +74,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-// Set Upload Status Helper
+// Upload status message set karne ke liye helper
 function setStatus(text, type = "info") {
     uploadStatus.innerText = text;
     uploadStatus.className = "status-message " + type;
-    
-    // Clear status after 5 seconds if not uploading
+
+    // Success/error messages 5 sec ke baad clear ho jayenge
     if (type !== "info") {
         setTimeout(() => {
             if (uploadStatus.innerText === text) {
@@ -72,14 +90,16 @@ function setStatus(text, type = "info") {
     }
 }
 
-// Handle File Selection
+// Selected files ko upload function me bhejna
 function handleFilesSelect(files) {
     uploadFiles(files);
 }
 
-// Upload Files to Backend
+// Files backend ko upload karna
 async function uploadFiles(files) {
     const formData = new FormData();
+
+    // Multiple files ko FormData me add karna
     for (let i = 0; i < files.length; i++) {
         formData.append("files", files[i]);
     }
@@ -89,6 +109,11 @@ async function uploadFiles(files) {
 
         const res = await fetch(`${API_BASE}/files/upload`, {
             method: "POST",
+
+            // FormData ke saath Content-Type manually mat dena.
+            // Browser khud boundary set karta hai.
+            headers: getAuthHeaders(),
+
             body: formData
         });
 
@@ -98,32 +123,41 @@ async function uploadFiles(files) {
         }
 
         const data = await res.text();
+
         setStatus(data || "Upload successful ✅", "success");
-        
-        // Refresh the file list
+
+        // Upload ke baad file list refresh
         loadFiles();
+
     } catch (err) {
         console.error(err);
         setStatus("Upload failed: " + err.message + " ❌", "error");
     }
 }
 
-// Load Files List
+// Uploaded files list backend se load karna
 async function loadFiles() {
     try {
-        const res = await fetch(`${API_BASE}/files`);
-        if (!res.ok) throw new Error("Failed to load documents");
-        
+        const res = await fetch(`${API_BASE}/files`, {
+            method: "GET",
+            headers: getAuthHeaders()
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to load documents");
+        }
+
         const files = await res.json();
+
         renderFileList(files);
+
     } catch (err) {
         console.error("Error loading files:", err);
     }
 }
 
-// Render File List in Sidebar
+// Sidebar me uploaded file list render karna
 function renderFileList(files) {
-
     fileList.innerHTML = "";
     docCount.innerText = files.length;
 
@@ -137,7 +171,6 @@ function renderFileList(files) {
     }
 
     files.forEach(file => {
-
         const li = document.createElement("li");
         li.className = "file-item";
 
@@ -178,127 +211,139 @@ function renderFileList(files) {
         `;
 
         fileList.appendChild(li);
-
     });
-
 }
 
+// File delete karna
+async function deleteFile(documentId, fileName) {
+    if (!confirm(`Are you sure you want to delete "${fileName}"? This will remove all associated vector data.`)) {
+        return;
+    }
 
-// Delete File
-        async function deleteFile(documentId, fileName) {
-            if (!confirm(`Are you sure you want to delete "${fileName}"? This will remove all associated vector data.`)) {
-                return;
-            }
+    try {
+        setStatus(`Deleting ${fileName}...`, "info");
 
-            try {
-                setStatus(`Deleting ${fileName}...`, "info");
-                const res = await fetch(`${API_BASE}/files/${documentId}`, {
-                    method: "DELETE"
-                });
+        const res = await fetch(`${API_BASE}/files/${documentId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders()
+        });
 
-                if (!res.ok) throw new Error("Delete failed");
-
-                setStatus("Deleted successfully ✅", "success");
-                loadFiles();
-            } catch (err) {
-                console.error(err);
-                setStatus("Delete failed ❌", "error");
-            }
+        if (!res.ok) {
+            throw new Error("Delete failed");
         }
 
-// Add Message to Chat Box
-        function addMessage(text, type) {
-            // Hide empty state on first message
-            if (emptyState) {
-                emptyState.style.display = "none";
-            }
+        setStatus("Deleted successfully ✅", "success");
 
-            const div = document.createElement("div");
-            div.classList.add("msg", type);
-            div.innerText = text;
+        // Delete ke baad file list refresh
+        loadFiles();
 
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+    } catch (err) {
+        console.error(err);
+        setStatus("Delete failed ❌", "error");
+    }
+}
 
-// Show Bot Typing Indicator
-        function showTypingIndicator() {
-            if (emptyState) {
-                emptyState.style.display = "none";
-            }
+// Chat box me message add karna
+function addMessage(text, type) {
+    // First message par empty state hide
+    if (emptyState) {
+        emptyState.style.display = "none";
+    }
 
-            typingIndicator = document.createElement("div");
-            typingIndicator.className = "typing-indicator";
-            typingIndicator.innerHTML = `
+    const div = document.createElement("div");
+    div.classList.add("msg", type);
+    div.innerText = text;
+
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Bot typing animation show karna
+function showTypingIndicator() {
+    if (emptyState) {
+        emptyState.style.display = "none";
+    }
+
+    typingIndicator = document.createElement("div");
+    typingIndicator.className = "typing-indicator";
+
+    typingIndicator.innerHTML = `
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
     `;
-            chatBox.appendChild(typingIndicator);
-            chatBox.scrollTop = chatBox.scrollHeight;
+
+    chatBox.appendChild(typingIndicator);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Bot typing animation remove karna
+function removeTypingIndicator() {
+    if (typingIndicator && typingIndicator.parentNode) {
+        typingIndicator.parentNode.removeChild(typingIndicator);
+    }
+
+    typingIndicator = null;
+}
+
+// Chatbot se question ask karna
+async function askQuestion() {
+    const question = questionInput.value.trim();
+
+    if (!question) {
+        return;
+    }
+
+    // Selected document IDs collect karna
+    const selectedDocumentIds = [];
+
+    document.querySelectorAll(".file-checkbox:checked")
+        .forEach(cb => {
+            selectedDocumentIds.push(cb.value);
+        });
+
+    // User ka message UI me add
+    addMessage(question, "user");
+
+    questionInput.value = "";
+
+    // Bot typing indicator show
+    showTypingIndicator();
+
+    try {
+        const res = await fetch(`${API_BASE}/query`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+
+                // JWT token backend ko bhejna.
+                // Backend token se userId extract karega.
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                question: question,
+                documentIds: selectedDocumentIds
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error("Query failed");
         }
 
-// Remove Bot Typing Indicator
-        function removeTypingIndicator() {
-            if (typingIndicator && typingIndicator.parentNode) {
-                typingIndicator.parentNode.removeChild(typingIndicator);
-            }
-            typingIndicator = null;
-        }
+        const data = await res.text();
 
-// Ask Question to Chatbot
-        async function askQuestion() {
+        removeTypingIndicator();
 
-            const question = questionInput.value.trim();
+        addMessage(data, "bot");
 
-            if (!question) return;
+    } catch (err) {
+        console.error(err);
 
-            // Selected files
-            const selectedDocumentIds = [];
+        removeTypingIndicator();
 
-            document.querySelectorAll(".file-checkbox:checked")
-                .forEach(cb => {
-                    selectedDocumentIds.push(cb.value);
-                });
-
-            // Add user message
-            addMessage(question, "user");
-            questionInput.value = "";
-
-            // Show typing indicator
-            showTypingIndicator();
-
-            try {
-
-                const res = await fetch(`${API_BASE}/query`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        question: question,
-                        documentIds: selectedDocumentIds
-                    })
-                });
-
-                if (!res.ok) {
-                    throw new Error("Query failed");
-                }
-
-                const data = await res.text();
-
-                removeTypingIndicator();
-                addMessage(data, "bot");
-
-            } catch (err) {
-
-                console.error(err);
-
-                removeTypingIndicator();
-
-                addMessage(
-                    "Error connecting to AI backend. Make sure the server and Ollama are running. ❌",
-                    "bot"
-                );
-            }
-        }
+        addMessage(
+            "Error connecting to AI backend. Make sure the server, Qdrant, Redis, and Ollama are running. ❌",
+            "bot"
+        );
+    }
+}

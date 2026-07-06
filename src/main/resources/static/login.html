@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Alchemy Login</title>
+</head>
+
+<body>
+
+    <h2>Login to Alchemy</h2>
+
+    <input id="email" type="email" placeholder="Email"><br><br>
+    <input id="password" type="password" placeholder="Password"><br><br>
+
+    <button onclick="login()">Login</button>
+
+    <p id="message"></p>
+
+    <p>
+        New user?
+        <a href="/signup.html">Create account</a>
+    </p>
+
+    <script>
+        async function login() {
+            const data = {
+                email: document.getElementById("email").value,
+                password: document.getElementById("password").value
+            };
+
+            const response = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            document.getElementById("message").innerText = result.message;
+
+            // Login successful hua toh token save karo
+            if (result.token) {
+                localStorage.setItem("alchemyToken", result.token);
+                localStorage.setItem("alchemyName", result.name);
+
+                // Login ke baad chatbot page pe bhejo
+                window.location.href = "/index.html";
+            }
+        }
+    </script>
+
+</body>
+
+</html>
