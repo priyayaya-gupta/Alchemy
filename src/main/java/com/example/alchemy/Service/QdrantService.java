@@ -62,11 +62,12 @@ public class QdrantService {
 
             String documentId = (String) payload.get("documentId");
             String fileName = (String) payload.get("fileName");
+            String sessionId = (String) payload.get("sessionId");
 
             if (documentId != null && fileName != null) {
                 files.putIfAbsent(
                         documentId,
-                        new FileInfo(documentId, fileName)
+                        new FileInfo(documentId, fileName, sessionId)
                 );
             }
         }

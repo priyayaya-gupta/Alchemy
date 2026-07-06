@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE= "http://localhost:8080/api";
 
 // DOM Elements
 const dropZone = document.getElementById("dropZone");
@@ -155,9 +155,11 @@ function renderFileList(files) {
             </label>
 
             <button
-                class="delete-btn"
-                onclick="deleteFile('${file.documentId}','${file.fileName}')"
-                title="Delete document">
+                    class="delete-btn"
+                    data-id="${file.documentId}"
+                    data-name="${file.fileName}"
+                    onclick="deleteFile(this.dataset.id, this.dataset.name)"
+                    title="Delete document">
 
                 <svg width="14"
                      height="14"
@@ -270,12 +272,13 @@ function renderFileList(files) {
 
             try {
 
-                const res = await fetch(`${API_BASE}/query`, {
+                const res = await fetch(`${API_BASE}/query/ask`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
+                        sessionId: "user00",
                         question: question,
                         documentIds: selectedDocumentIds
                     })

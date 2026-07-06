@@ -14,10 +14,11 @@ public class QueryController {
                 this.ragService = ragService;
         }
 
-        @PostMapping
+        @PostMapping("/ask")
         public String ask(@RequestBody QuestionRequest request) {
 
                 return ragService.getAnswer(
+                        request.getSessionId(),
                         request.getQuestion(),
                         request.getDocumentIds()
                 );

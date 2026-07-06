@@ -1,33 +1,27 @@
 package com.example.alchemy.Service;
-
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.commands.ProtocolCommand;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class CacheService {
 
     private JedisPool jedisPool;
-
+    private static final Logger logger=LoggerFactory.getLogger(CacheService.class);
     private static final String INDEX_NAME = "alchemy_semantic_idx";
     private static final String CACHE_PREFIX = "alchemy:semantic:";
     private static final String ADMISSION_PREFIX = "alchemy:admission:";
-
-    @Value("${spring.data.redis.host:localhost}")
-    private String redisHost;
-
-    @Value("${spring.data.redis.port:6379}")
-    private int redisPort;
 
     @Value("${app.cache.ttl-days}")
     private long ttlDays;
@@ -41,13 +35,15 @@ public class CacheService {
     @Value("${app.cache.admission-threshold}")
     private int admissionThreshold;
 
-    @PostConstruct
-    public void init() {
-        this.jedisPool = new JedisPool(redisHost, redisPort);
-        createVectorIndex();
+
+
+    public CacheService(JedisPool jedisPool) {
+        this.jedisPool = jedisPool;
     }
 
+
     public void createVectorIndex() {
+
         try (Jedis jedis = jedisPool.getResource()) {
             jedis.sendCommand(
                     RedisSearchCommand.FT_CREATE,
@@ -138,6 +134,7 @@ public class CacheService {
     }
 
     public void clearRagCache() {
+        logger.info("Starting Redis cache clearance process...");
         try (Jedis jedis = jedisPool.getResource()) {
             Set<String> cacheKeys = jedis.keys(CACHE_PREFIX + "*");
             Set<String> admissionKeys = jedis.keys(ADMISSION_PREFIX + "*");
@@ -150,10 +147,10 @@ public class CacheService {
                 jedis.del(admissionKeys.toArray(new String[0]));
             }
 
-            System.out.println("Redis cache and admission counters cleared");
+            logger.info("Redis cache and admission counters cleared");
 
         } catch (Exception e) {
-            System.out.println("Could not clear Redis cache: " + e.getMessage());
+            logger.error("Could not clear Redis cache: " + e.getMessage());
         }
     }
 

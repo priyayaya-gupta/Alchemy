@@ -11,7 +11,7 @@ public class ChunkingService {
             LoggerFactory.getLogger(ChunkingService.class);
     private StringBuilder getLastNSentences(String text, int n) {
 
-        String[] sentences = text.split("\\. ");
+        String[] sentences = text.split("(?<=[.!?])\\s+");
         StringBuilder overlap = new StringBuilder();
 
         int start = Math.max(0, sentences.length - n);
