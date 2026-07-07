@@ -376,7 +376,8 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.msg.user {
+.msg.
+user {
     background-color: var(--primary);
     color: var(--text-white);
     align-self: flex-end;

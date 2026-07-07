@@ -1,5 +1,6 @@
 package com.example.alchemy.Controller;
 
+import com.example.alchemy.Service.ChatService;
 import com.example.alchemy.Service.RAGService;
 import com.example.alchemy.dto.QuestionRequest;
 import org.springframework.web.bind.annotation.*;
@@ -8,16 +9,16 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/query")
 public class QueryController {
 
-        private final RAGService ragService;
+        private final ChatService chatService;
 
-        public QueryController(RAGService ragService) {
-                this.ragService = ragService;
+        public QueryController(ChatService chatService) {
+                this.chatService = chatService;
         }
 
         @PostMapping("/ask")
         public String ask(@RequestBody QuestionRequest request) {
 
-                return ragService.getAnswer(
+                return chatService.chat(
                         request.getSessionId(),
                         request.getQuestion(),
                         request.getDocumentIds()

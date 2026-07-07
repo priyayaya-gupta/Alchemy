@@ -3,6 +3,7 @@ package com.example.alchemy.Service;
 import com.example.alchemy.Service.*;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -60,9 +61,11 @@ public class ChatService {
                 embeddingService.embed(question);
 
         // Semantic cache lookup
-        String cached =
-                cacheService.findSimilarCachedAnswer(vector);
-
+        String cached = cacheService.findSimilarCachedAnswer(
+                vector,
+                documentIds,
+                Collections.emptyList()
+        );
         if (cached != null) {
 
             conversationService.appendMessage(
@@ -70,6 +73,8 @@ public class ChatService {
                     "assistant",
                     cached
             );
+
+            summaryService.updateSummary(sessionId);
 
             return cached;
         }
@@ -103,12 +108,18 @@ public class ChatService {
         summaryService.updateSummary(sessionId);
 
         // Cache answer if admission policy allows
-        if (cacheService.shouldCacheNow(question)) {
+        if (cacheService.shouldCacheNow(
+                question,
+                documentIds,
+                Collections.emptyList()
+        )) {
 
             cacheService.saveSemanticCache(
                     question,
                     vector,
-                    answer
+                    answer,
+                    documentIds,
+                    Collections.emptyList()
             );
         }
 

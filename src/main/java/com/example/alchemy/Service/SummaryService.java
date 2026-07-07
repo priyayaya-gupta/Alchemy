@@ -25,7 +25,10 @@ public class SummaryService {
     public void updateSummary(String sessionId) {
         System.out.println("updateSummary called for " + sessionId);
         // Don't summarize until enough conversation exists
-        if (!conversationService.shouldSummarize(sessionId)) {
+        boolean should = conversationService.shouldSummarize(sessionId);
+        System.out.println("Should summarize = " + should);
+
+        if (!should) {
             return;
         }
 
@@ -60,6 +63,8 @@ public class SummaryService {
         memoryService.saveSummary(
                 sessionId,
                 updatedSummary);
+
+        System.out.println("UPDATED SUMMARY = [" + updatedSummary + "]");
 
         conversationService.keepRemainingMessages(sessionId);
     }

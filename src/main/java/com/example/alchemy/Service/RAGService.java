@@ -2,6 +2,7 @@ package com.example.alchemy.Service;
 
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -30,8 +31,8 @@ public class RAGService {
         this.cacheService = cacheService;
         this.embeddingService = embeddingService;
         this.memoryService = memoryService;
-        this.conversationService=conversationService;
-        this.summaryService=summaryService;
+        this.conversationService = conversationService;
+        this.summaryService = summaryService;
     }
 
     public String getAnswer(String sessionId,
@@ -50,9 +51,11 @@ public class RAGService {
 
         List<Double> questionVector = embeddingService.embed(question);
 
-        String cachedAnswer =
-                cacheService.findSimilarCachedAnswer(questionVector);
-
+        String cachedAnswer = cacheService.findSimilarCachedAnswer(
+                questionVector,
+                documentIds,
+                Collections.emptyList()
+        );
         if (cachedAnswer != null) {
 
             conversationService.appendMessage(
@@ -92,14 +95,18 @@ public class RAGService {
                 answer
         );
 
-        summaryService.updateSummary(sessionId);
-
-        if (cacheService.shouldCacheNow(question)) {
+        if (cacheService.shouldCacheNow(
+                question,
+                documentIds,
+                Collections.emptyList()
+        )) {
 
             cacheService.saveSemanticCache(
                     question,
                     questionVector,
-                    answer
+                    answer,
+                    documentIds,
+                    Collections.emptyList()
             );
         }
 
