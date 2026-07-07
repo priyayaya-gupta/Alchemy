@@ -278,7 +278,7 @@ function renderFileList(files) {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        sessionId: "user00",
+                        sessionId: "user1111",
                         question: question,
                         documentIds: selectedDocumentIds
                     })
