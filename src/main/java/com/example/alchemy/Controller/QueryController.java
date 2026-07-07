@@ -14,12 +14,13 @@ public class QueryController {
                 this.ragService = ragService;
         }
 
-        @PostMapping
+        @PostMapping("/ask")
         public String ask(@RequestBody QuestionRequest request) {
+
                 return ragService.getAnswer(
-                                request.getQuestion(),
-                                request.getDocumentIds(),
-                                request.getFileNames(),
-                                request.getSessionId());
+                        request.getSessionId(),
+                        request.getQuestion(),
+                        request.getDocumentIds()
+                );
         }
 }

@@ -1,57 +1,74 @@
 package com.example.alchemy.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 
-import java.util.Collections;
-import java.util.List;
-
 @Service
 public class MemoryService {
 
+    private static final Logger log = LoggerFactory.getLogger(MemoryService.class);
+
+    private static final String MEMORY_PREFIX =
+            "alchemy:memory:summary:";
+
     private final JedisPool jedisPool;
 
-    @Value("${app.memory.max-messages:20}")
-    private int maxMessages;
-
-    @Value("${app.memory.ttl-days:7}")
+    @Value("${app.memory.ttl-days:30}")
     private long ttlDays;
 
-    public MemoryService() {
-        this.jedisPool = new JedisPool("localhost", 6379);
+    public MemoryService(JedisPool jedisPool) {
+        this.jedisPool = jedisPool;
     }
 
-    public List<String> getRecentMemory(String sessionId) {
+    public String getSummary(String sessionId) {
+
         try (Jedis jedis = jedisPool.getResource()) {
-            List<String> memory = jedis.lrange(key(sessionId), 0, maxMessages - 1);
-            Collections.reverse(memory);
-            return memory;
+
+            return jedis.get(MEMORY_PREFIX + sessionId);
+
+        } catch (Exception e) {
+
+            log.error("Failed to retrieve conversation summary", e);
+            return null;
         }
     }
 
-    public void saveTurn(String sessionId, String question, String answer) {
+    public void saveSummary(String sessionId, String summary) {
+
         try (Jedis jedis = jedisPool.getResource()) {
-            String turn = "User: " + question + "\nAssistant: " + answer;
 
-            jedis.lpush(key(sessionId), turn);
-            jedis.ltrim(key(sessionId), 0, maxMessages - 1);
-            jedis.expire(key(sessionId), ttlDays * 24 * 60 * 60);
+            String key = MEMORY_PREFIX + sessionId;
+
+            jedis.set(key, summary);
+
+            jedis.expire(key, (int) (ttlDays * 24 * 60 * 60));
+
+            log.info("Conversation summary saved for session {}", sessionId);
+
+        } catch (Exception e) {
+
+            log.error("Failed to save conversation summary", e);
         }
     }
 
-    public void clearMemory(String sessionId) {
+    public void deleteSummary(String sessionId) {
+
         try (Jedis jedis = jedisPool.getResource()) {
-            jedis.del(key(sessionId));
-        }
-    }
 
-    private String key(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
-            sessionId = "default";
-        }
+            jedis.del(MEMORY_PREFIX + sessionId);
 
-        return "alchemy:memory:" + sessionId;
+            log.info("Conversation summary deleted for session {}", sessionId);
+
+        } catch (Exception e) {
+
+            log.error("Failed to delete conversation summary", e);
+        }
     }
 }
+
+//Ye sirf summary rakhta hai. --> upar wali conversation ki summary save karega redis mai
+//conversation service-->LLM summary--> MemoryService
