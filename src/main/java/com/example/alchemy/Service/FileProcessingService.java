@@ -1,5 +1,6 @@
 package com.example.alchemy.Service;
 
+import com.example.alchemy.chunking.model.Chunk;
 import org.apache.tika.Tika;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,26 +48,25 @@ public class FileProcessingService {
             throw new RuntimeException("No text extracted from file");
         }
 
-        List<String> chunks = chunkingService.chunkText(text);
+        List<Chunk> chunks = chunkingService.chunkDocument(text, fileName, documentId);
 
         log.info("CHUNKING COMPLETED");
         log.info("TOTAL CHUNKS: {}", chunks.size());
 
-        int chunkIndex = 0;
-
-        for (String chunk : chunks) {
+        for (Chunk chunk : chunks) {
+            int chunkIndex = chunk.getMetadata().getChunkIndex();
+            String chunkText = chunk.getFullTextWithOverlap();
 
             log.info("PROCESSING CHUNK INDEX: {}", chunkIndex);
-            log.info("CHUNK PREVIEW: {}", chunk.substring(0, Math.min(chunk.length(), 150)));
+            log.info("CHUNK PREVIEW: {}", chunkText.substring(0, Math.min(chunkText.length(), 150)));
 
-            List<Double> vector = embeddingService.embed(chunk);
+            List<Double> vector = embeddingService.embed(chunkText);
 
             log.info("EMBEDDING DONE");
             log.info("VECTOR SIZE: {}", vector != null ? vector.size() : 0);
 
             if (vector == null || vector.isEmpty()) {
                 log.error("VECTOR IS NULL OR EMPTY for chunk index {}", chunkIndex);
-                chunkIndex++;
                 continue;
             }
 
@@ -75,13 +75,10 @@ public class FileProcessingService {
             qdrantService.store(
                     pointId,
                     vector,
-                    chunk,
-                    documentId,
-                    fileName);
+                    chunkText,
+                    chunk.getMetadata().toMap());
 
             log.info("STORED IN QDRANT. POINT ID: {}", pointId);
-
-            chunkIndex++;
         }
 
         cacheService.clearRagCache();
