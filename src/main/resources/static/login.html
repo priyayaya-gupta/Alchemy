@@ -3,23 +3,24 @@
 
 <head>
     <title>Alchemy Login</title>
+    <link rel="icon" href="data:,">
 </head>
 
 <body>
 
     <h2>Login to Alchemy</h2>
 
-    <input id="email" type="email" placeholder="Email"><br><br>
-    <input id="password" type="password" placeholder="Password"><br><br>
+    <input id="email" type="email" placeholder="Email" required>
+    <br><br>
+
+    <input id="password" type="password" placeholder="Password" required>
+    <br><br>
 
     <button onclick="login()">Login</button>
 
-    <p id="message"></p>
+    <br><br>
 
-    <p>
-        New user?
-        <a href="/signup.html">Create account</a>
-    </p>
+    <p id="message"></p>
 
     <script>
         async function login() {
@@ -28,25 +29,45 @@
                 password: document.getElementById("password").value
             };
 
-            const response = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(data)
-            });
+            try {
+                const response = await fetch("/api/auth/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    // credentials: "include" zaroori hai taaki browser
+                    // Set-Cookie response header ko accept kare.
+                    // Backend "alchemyToken" naam ki HttpOnly cookie set karega.
+                    // JavaScript is cookie ko read nahi kar sakta — XSS protection.
+                    credentials: "include",
+                    body: JSON.stringify(data)
+                });
 
-            const result = await response.json();
+                const result = await response.json();
 
-            document.getElementById("message").innerText = result.message;
+                document.getElementById("message").innerText = result.message;
 
-            // Login successful hua toh token save karo
-            if (result.token) {
-                localStorage.setItem("alchemyToken", result.token);
-                localStorage.setItem("alchemyName", result.name);
+                // CHANGED (Cookie Migration):
+                // Pehle: if (result.token) — token JSON me aata tha, localStorage me store hota tha
+                // Ab:    Backend token JSON me nahi bhejta — sirf HttpOnly cookie set karta hai
+                //        Isliye ab message check karte hain, token nahi
+                if (result.message === "Login successful") {
 
-                // Login ke baad chatbot page pe bhejo
-                window.location.href = "/index.html";
+                    // JWT token ab localStorage me kabhi store nahi karte.
+                    // Token browser ki HttpOnly cookie me safely store ho gaya hai.
+                    // Sirf UI display ke liye naam aur role save karte hain — ye sensitive nahi hain.
+                    localStorage.setItem("alchemyName", result.name);
+                    localStorage.setItem("alchemyRole", result.role);
+
+                    // Admin aur User dono chatbot page par jayenge
+                    window.location.href = "/index.html";
+                }
+
+            } catch (error) {
+                document.getElementById("message").innerText =
+                    "Unable to connect to server.";
+
+                console.error(error);
             }
         }
     </script>

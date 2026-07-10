@@ -19,20 +19,18 @@ public class JwtService {
     private long jwtExpirationMs;
 
     private SecretKey getSigningKey() {
-        // Secret key JWT sign/verify karne ke liye use hoti hai.
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
-    public String generateToken(String userId, String email) {
+    public String generateToken(String userId, String email, String role) {
 
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtExpirationMs);
 
-        // JWT ke andar userId and email store kar rahe hain.
-        // Password kabhi JWT me nahi daalna.
         return Jwts.builder()
                 .subject(userId)
                 .claim("email", email)
+                .claim("role", role) // Token me role bhi store hoga
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(getSigningKey())
@@ -40,25 +38,23 @@ public class JwtService {
     }
 
     public String extractUserId(String token) {
-        // Token ke subject me userId rakha hai.
         return getClaims(token).getSubject();
+    }
+
+    public String extractRole(String token) {
+        return getClaims(token).get("role", String.class);
     }
 
     public boolean isTokenValid(String token) {
         try {
             Claims claims = getClaims(token);
-
-            // Token expired nahi hona chahiye.
             return claims.getExpiration().after(new Date());
-
         } catch (Exception e) {
-            // Invalid/expired token yahan fail hoga.
             return false;
         }
     }
 
     private Claims getClaims(String token) {
-        // Token verify karke claims nikalta hai.
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()

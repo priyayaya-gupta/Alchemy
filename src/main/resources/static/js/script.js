@@ -12,19 +12,37 @@ const questionInput = document.getElementById("questionInput");
 
 let typingIndicator = null;
 
-// JWT token localStorage se nikaalte hain.
-// Agar token nahi hai, user ko login page pe bhej dete hain.
-function getAuthHeaders() {
-    const token = localStorage.getItem("alchemyToken");
+// ================================================================
+// REMOVED: getAuthHeaders() function hata diya.
+//
+// Pehle yeh function tha:
+//   function getAuthHeaders() {
+//       const token = localStorage.getItem("alchemyToken");
+//       if (!token) { window.location.href = "/login.html"; return {}; }
+//       return { "Authorization": "Bearer " + token };
+//   }
+//
+// Kyun hataya:
+//   - Token ab localStorage me nahi hai — HttpOnly cookie me hai
+//   - JavaScript cookie read nahi kar sakta (HttpOnly=true) — XSS protection
+//   - Browser khud "alchemyToken" cookie har API call pe attach karta hai
+//   - Hume bas credentials: "include" add karna hai — koi manual header nahi
+// ================================================================
 
-    if (!token) {
+// ================================================================
+// 401 / 403 Handler
+// Cookie expire ho gayi ya invalid hai toh server 401/403 return karta hai.
+// Iss function ko har API response ke baad call karo.
+// Returns true agar redirect hua (caller ko apna logic rok dena chahiye).
+// ================================================================
+function handleUnauthorized(response) {
+    if (response.status === 401 || response.status === 403) {
+        // Session expire — login page par bhejo
+        console.warn("Session expired or unauthorized. Redirecting to login.");
         window.location.href = "/login.html";
-        return {};
+        return true;
     }
-
-    return {
-        "Authorization": "Bearer " + token
-    };
+    return false;
 }
 
 // Event Listeners
@@ -110,12 +128,20 @@ async function uploadFiles(files) {
         const res = await fetch(`${API_BASE}/files/upload`, {
             method: "POST",
 
-            // FormData ke saath Content-Type manually mat dena.
-            // Browser khud boundary set karta hai.
-            headers: getAuthHeaders(),
+            // CHANGED (Cookie Migration):
+            // Pehle: headers: getAuthHeaders() — localStorage token header me deta tha
+            // Ab:    Koi Authorization header nahi — browser "alchemyToken" HttpOnly cookie
+            //        automatically attach karta hai jab credentials: "include" hota hai
+            //
+            // NOTE: FormData ke saath Content-Type header manually MAT do.
+            //       Browser khud multipart/form-data boundary set karta hai.
+            credentials: "include",
 
             body: formData
         });
+
+        // 401/403: Session expire ya unauthorized
+        if (handleUnauthorized(res)) return;
 
         if (!res.ok) {
             const errorText = await res.text();
@@ -140,8 +166,15 @@ async function loadFiles() {
     try {
         const res = await fetch(`${API_BASE}/files`, {
             method: "GET",
-            headers: getAuthHeaders()
+
+            // CHANGED (Cookie Migration):
+            // Pehle: headers: getAuthHeaders() — token header me tha
+            // Ab:    credentials: "include" — browser cookie automatically bhejta hai
+            credentials: "include"
         });
+
+        // 401/403: Session expire ya unauthorized
+        if (handleUnauthorized(res)) return;
 
         if (!res.ok) {
             throw new Error("Failed to load documents");
@@ -225,8 +258,15 @@ async function deleteFile(documentId, fileName) {
 
         const res = await fetch(`${API_BASE}/files/${documentId}`, {
             method: "DELETE",
-            headers: getAuthHeaders()
+
+            // CHANGED (Cookie Migration):
+            // Pehle: headers: getAuthHeaders() — token header me tha
+            // Ab:    credentials: "include" — browser cookie automatically bhejta hai
+            credentials: "include"
         });
+
+        // 401/403: Session expire ya unauthorized
+        if (handleUnauthorized(res)) return;
 
         if (!res.ok) {
             throw new Error("Delete failed");
@@ -314,17 +354,31 @@ async function askQuestion() {
         const res = await fetch(`${API_BASE}/query`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
+                // JSON body ke liye Content-Type zaroori hai — yeh rakhna padega
+                "Content-Type": "application/json"
 
-                // JWT token backend ko bhejna.
-                // Backend token se userId extract karega.
-                ...getAuthHeaders()
+                // REMOVED: ...getAuthHeaders()
+                // Pehle: Authorization header manually spread hota tha
+                // Ab:    Cookie automatically bhejti hai — header ki zarurat nahi
             },
+
+            // CHANGED (Cookie Migration):
+            // credentials: "include": Browser "alchemyToken" HttpOnly cookie
+            // automatically POST request ke saath attach karega.
+            // JavaScript token ko kabhi read nahi karega — HttpOnly protection.
+            credentials: "include",
+
             body: JSON.stringify({
                 question: question,
                 documentIds: selectedDocumentIds
             })
         });
+
+        // 401/403: Session expire ya unauthorized
+        if (handleUnauthorized(res)) {
+            removeTypingIndicator();
+            return;
+        }
 
         if (!res.ok) {
             throw new Error("Query failed");

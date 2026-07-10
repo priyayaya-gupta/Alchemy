@@ -1,24 +1,37 @@
 package com.example.alchemy.Model;
 
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@Entity // Is class ki MySQL table banegi
+@Table(name = "users") // Table name users hoga
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class User {
 
-    // Internal unique ID. User ko yaad nahi rakhna.
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) 
+    // MySQL automatically id generate karega
+    private Long id;
+
+    @Column(unique = true, nullable = false)
+    // userId bhi unique rakhenge
     private String userId;
 
-    // User ka display name.
     private String name;
 
-    // Login ke liye email use hoga.
+    @Column(unique = true, nullable = false)
+    // Same email se duplicate user nahi banega
     private String email;
 
-    // Real password nahi store karna.
-    // BCrypt hashed password store hoga.
+    @Column(nullable = false)
+    // Plain password nahi, BCrypt hash store hoga
     private String passwordHash;
+
+    @Enumerated(EnumType.STRING)
+    // MySQL me ADMIN ya USER text form me save hoga
+    private Role role;
 }
