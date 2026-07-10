@@ -96,7 +96,7 @@ public class QdrantService {
         }
     }
 
-    // ---------------------------
+// ---------------------------
     // STORE / UPSERT VECTORS
     // ---------------------------
      public void store(String id,
@@ -104,11 +104,25 @@ public class QdrantService {
                       String text,
                       String documentId,
                       String fileName){
+         Map<String, Object> payload = Map.of(
+                 "documentId", documentId,
+                 "fileName", fileName
+         );
+         store(id, vector, text, payload);
+     }
+
+     public void store(String id,
+                      List<Double> vector,
+                      String text,
+                      Map<String, Object> payload){
 
         String url = baseUrl
                 + "/collections/"
                 + collection
                 + "/points";
+
+        Map<String, Object> payloadMap = new HashMap<>(payload);
+        payloadMap.put("text", text);
 
         Map<String, Object> body = Map.of(
                 "points",
@@ -116,11 +130,7 @@ public class QdrantService {
                         Map.of(
                                 "id", Integer.parseInt(id),
                                 "vector", vector,
-                                "payload", Map.of(
-                                        "text", text,
-                                        "documentId", documentId,
-                                        "fileName", fileName
-                                )
+                                "payload", payloadMap
                         )
                 )
         );
