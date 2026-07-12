@@ -1,6 +1,5 @@
 package com.example.alchemy.Service;
 
-import com.example.alchemy.Service.*;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -17,6 +16,9 @@ public class ChatService {
     private final MemoryService memoryService;
     private final SummaryService summaryService;
 
+    // SecurityContextHolder se current logged-in user ka userId deta hai
+    private final CurrentUserService currentUserService;
+
     public ChatService(
             EmbeddingService embeddingService,
             CacheService cacheService,
@@ -24,7 +26,8 @@ public class ChatService {
             LlmService llmService,
             ConversationService conversationService,
             MemoryService memoryService,
-            SummaryService summaryService
+            SummaryService summaryService,
+            CurrentUserService currentUserService
     ) {
         this.embeddingService = embeddingService;
         this.cacheService = cacheService;
@@ -33,6 +36,7 @@ public class ChatService {
         this.conversationService = conversationService;
         this.memoryService = memoryService;
         this.summaryService = summaryService;
+        this.currentUserService = currentUserService;
     }
 
     public String chat(
@@ -41,84 +45,122 @@ public class ChatService {
             List<String> documentIds
     ) {
 
-        // Save user message
+        /*
+         * JwtAuthenticationFilter ne authenticated user's userId
+         * SecurityContextHolder me principal ke roop me save kiya hai.
+         */
+        String userId = currentUserService.getCurrentUserId();
+
+        /*
+         * Agar frontend sessionId na bheje, "default" use hoga.
+         *
+         * Random UUID use nahi kar rahe, kyunki har request par naya UUID
+         * banne se conversation history aur summary continue nahi hoti.
+         */
+        String safeSessionId =
+                sessionId == null || sessionId.isBlank()
+                        ? "default"
+                        : sessionId.trim();
+
+        /*
+         * userId aur sessionId combine karne se different users ki
+         * conversation memory mix nahi hogi.
+         *
+         * Example:
+         * User A -> abc123:default
+         * User B -> xyz789:default
+         */
+        String userSessionId = userId + ":" + safeSessionId;
+
+        /*
+         * documentIds null ho sakta hai.
+         * Empty list use karne se NullPointerException avoid hoga.
+         */
+        List<String> safeDocumentIds =
+                documentIds == null
+                        ? Collections.emptyList()
+                        : documentIds;
+
+        // Current user's message conversation me store karna
         conversationService.appendMessage(
-                sessionId,
+                userSessionId,
                 "user",
                 question
         );
 
-        // Load conversation summary
-        String summary =
-                memoryService.getSummary(sessionId);
+        // Current user-session ki existing summary load karna
+        String summary = memoryService.getSummary(userSessionId);
 
         if (summary == null) {
             summary = "";
         }
 
-        // Generate embedding
-        List<Double> vector =
-                embeddingService.embed(question);
+        // Question ka embedding generate karna
+        List<Double> vector = embeddingService.embed(question);
 
-        // Semantic cache lookup
-        String cached = cacheService.findSimilarCachedAnswer(
+        // Existing semantic cache me similar answer search karna
+        String cachedAnswer = cacheService.findSimilarCachedAnswer(
                 vector,
-                documentIds,
+                safeDocumentIds,
                 Collections.emptyList()
         );
-        if (cached != null) {
 
+        if (cachedAnswer != null) {
+
+            // Cached answer ko bhi current user's conversation me add karna
             conversationService.appendMessage(
-                    sessionId,
+                    userSessionId,
                     "assistant",
-                    cached
+                    cachedAnswer
             );
 
-            summaryService.updateSummary(sessionId);
+            // Zarurat hone par current user-session ki summary update karna
+            summaryService.updateSummary(userSessionId);
 
-            return cached;
+            return cachedAnswer;
         }
 
-        // Retrieve chunks
-        List<String> chunks =
-                retrievalService.retrieve(
-                        question,
-                        documentIds
-                );
+        // Selected documents se relevant chunks retrieve karna
+        List<String> chunks = retrievalService.retrieve(
+                question,
+                safeDocumentIds
+        );
 
-        String context =
-                String.join("\n\n", chunks);
+        // Retrieved chunks ko LLM context me combine karna
+        String context = String.join("\n\n", chunks);
 
-        // LLM Answer
-        String answer =
-                llmService.generateAnswer(
-                        question,
-                        context,
-                        summary
-                );
+        // Context aur conversation summary use karke answer generate karna
+        String answer = llmService.generateAnswer(
+                question,
+                context,
+                summary
+        );
 
-        // Save assistant response
+        // Generated answer current user's conversation me save karna
         conversationService.appendMessage(
-                sessionId,
+                userSessionId,
                 "assistant",
                 answer
         );
 
-        // Update conversation summary if needed
-        summaryService.updateSummary(sessionId);
+        // Conversation enough badi ho toh summary update hogi
+        summaryService.updateSummary(userSessionId);
 
-        // Cache answer if admission policy allows
-        if (cacheService.shouldCacheNow(
+        // Cache admission policy check karna
+        boolean shouldCache = cacheService.shouldCacheNow(
                 question,
-                documentIds,
+                safeDocumentIds,
                 Collections.emptyList()
-        )) {
+        );
 
+        if (shouldCache) {
+
+            // Eligible answer ko semantic cache me save karna
             cacheService.saveSemanticCache(
                     question,
                     vector,
                     answer,
-                    documentIds,
+                    safeDocumentIds,
                     Collections.emptyList()
             );
         }

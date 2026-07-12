@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Alchemy Login</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="auth-page">
+
+    <div class="auth-layout">
+
+        <!-- Left Branding Panel -->
+        <section class="auth-brand-panel">
+
+            <div class="auth-brand">
+
+                <div class="auth-logo">
+                    <span>🧪</span>
+                    <h1>Alchemy</h1>
+                </div>
+
+                <p class="auth-tagline">
+                    AI PDF Knowledge Assistant
+                </p>
+
+            </div>
+
+            <div class="auth-brand-content">
+
+                <div class="auth-illustration">🤖</div>
+
+                <h2>Turn documents into answers</h2>
+
+                <p>
+                    Upload your files, ask questions, and retrieve useful
+                    information using AI-powered document intelligence.
+                </p>
+
+                <div class="auth-feature-list">
+
+                    <div class="auth-feature">
+                        <span>📄</span>
+                        <p>Upload and manage documents</p>
+                    </div>
+
+                    <div class="auth-feature">
+                        <span>🔎</span>
+                        <p>Retrieve relevant information</p>
+                    </div>
+
+                    <div class="auth-feature">
+                        <span>💬</span>
+                        <p>Chat with your knowledge base</p>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <p class="auth-footer-text">
+                Secure access powered by JWT authentication
+            </p>
+
+        </section>
+
+        <!-- Right Login Panel -->
+        <main class="auth-form-panel">
+
+            <div class="auth-card">
+
+                <div class="auth-card-header">
+                    <span class="auth-card-icon">👋</span>
+
+                    <h2>Welcome back</h2>
+
+                    <p>
+                        Log in using the credentials created by your administrator.
+                    </p>
+                </div>
+
+                <form id="loginForm">
+
+                    <div class="auth-field">
+                        <label for="email">Email address</label>
+
+                        <input id="email" type="email" placeholder="Enter your email" autocomplete="email" required>
+                    </div>
+
+                    <div class="auth-field">
+                        <label for="password">Password</label>
+
+                        <input id="password" type="password" placeholder="Enter your password"
+                            autocomplete="current-password" required>
+                    </div>
+
+                    <button id="loginButton" type="submit" class="auth-primary-btn">
+
+                        Log In
+                    </button>
+
+                    <p id="message" class="auth-message"></p>
+
+                </form>
+
+                <div class="auth-info-box">
+                    <span>🔐</span>
+
+                    <p>
+                        Accounts are created and managed by the Alchemy administrator.
+                    </p>
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <script>
+
+        const loginForm = document.getElementById("loginForm");
+        const loginButton = document.getElementById("loginButton");
+        const message = document.getElementById("message");
+
+        loginForm.addEventListener("submit", login);
+
+        async function login(event) {
+
+            // Form submit hone par page reload rokna
+            event.preventDefault();
+
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+
+            message.innerText = "";
+            message.className = "auth-message";
+
+            loginButton.disabled = true;
+            loginButton.innerText = "Logging in...";
+
+            try {
+
+                const response = await fetch("/alchemy/api/auth/login", {
+
+                    method: "POST",
+
+                    // Backend HttpOnly JWT cookie set karega
+                    credentials: "include",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.message !== "Login successful") {
+
+                    message.innerText =
+                        result.message || "Invalid email or password.";
+
+                    message.className = "auth-message error";
+
+                    return;
+                }
+
+                /*
+                 * JWT localStorage me save nahi hoga.
+                 * JWT backend ke through HttpOnly cookie me store hota hai.
+                 *
+                 * Name aur role sirf UI display ke liye localStorage me hain.
+                 */
+                localStorage.setItem("alchemyName", result.name);
+                localStorage.setItem("alchemyRole", result.role);
+
+                message.innerText = "Login successful. Redirecting...";
+                message.className = "auth-message success";
+
+                window.location.href = "/alchemy/index.html";
+
+            } catch (error) {
+
+                console.error("Login error:", error);
+
+                message.innerText =
+                    "Unable to connect to the Alchemy server.";
+
+                message.className = "auth-message error";
+
+            } finally {
+
+                loginButton.disabled = false;
+                loginButton.innerText = "Log In";
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>

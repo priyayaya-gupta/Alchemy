@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Alchemy Admin Dashboard</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="admin-page">
+
+    <div class="admin-layout">
+
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+
+            <div>
+
+                <div class="admin-brand">
+                    <span>🧪</span>
+                    <h1>Alchemy</h1>
+                </div>
+
+                <p class="admin-brand-tagline">
+                    Administration Portal
+                </p>
+
+                <nav class="admin-nav">
+
+                    <button class="admin-nav-item active">
+                        <span>➕</span>
+                        Create User/Admin
+                    </button>
+
+                    <button class="admin-nav-item" onclick="backToChatbot()">
+
+                        <span>🤖</span>
+                        Open Chatbot
+                    </button>
+
+                </nav>
+
+            </div>
+
+            <button class="admin-sidebar-logout" onclick="logout()">
+                <span>↪</span>
+                Logout
+            </button>
+
+        </aside>
+
+        <!-- Main Area -->
+        <main class="admin-main">
+
+            <header class="admin-header">
+
+                <div>
+                    <p class="admin-eyebrow">ADMINISTRATION</p>
+                    <h2>Create a new account</h2>
+
+                    <p>
+                        Create credentials for a normal user or another administrator.
+                    </p>
+                </div>
+
+                <div class="admin-profile">
+                    <div class="admin-avatar">A</div>
+
+                    <div>
+                        <strong id="adminName">Administrator</strong>
+                        <span>ADMIN</span>
+                    </div>
+                </div>
+
+            </header>
+
+            <section class="admin-content">
+
+                <div class="admin-form-card">
+
+                    <div class="admin-form-heading">
+
+                        <div class="admin-form-icon">👤</div>
+
+                        <div>
+                            <h3>Account information</h3>
+                            <p>Enter the details for the new Alchemy account.</p>
+                        </div>
+
+                    </div>
+
+                    <form id="createUserForm">
+
+                        <div class="admin-form-grid">
+
+                            <div class="auth-field">
+                                <label for="name">Full name</label>
+
+                                <input id="name" type="text" placeholder="Enter full name" required>
+                            </div>
+
+                            <div class="auth-field">
+                                <label for="email">Email address</label>
+
+                                <input id="email" type="email" placeholder="Enter email address" required>
+                            </div>
+
+                            <div class="auth-field">
+                                <label for="password">Temporary password</label>
+
+                                <input id="password" type="password" placeholder="Create a password" required>
+                            </div>
+
+                            <div class="auth-field">
+                                <label for="role">Account role</label>
+
+                                <select id="role">
+                                    <option value="USER">USER</option>
+                                    <option value="ADMIN">ADMIN</option>
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <div class="admin-role-note">
+
+                            <span>ℹ️</span>
+
+                            <p>
+                                USER accounts can access the chatbot.
+                                ADMIN accounts can also manage users and documents.
+                            </p>
+
+                        </div>
+
+                        <div class="admin-form-actions">
+
+                            <button type="button" class="admin-secondary-btn" onclick="clearForm()">
+
+                                Clear
+                            </button>
+
+                            <button id="createButton" type="submit" class="auth-primary-btn">
+
+                                Create Account
+                            </button>
+
+                        </div>
+
+                        <p id="message" class="auth-message"></p>
+
+                    </form>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+    <script>
+
+        const role = localStorage.getItem("alchemyRole");
+        const name = localStorage.getItem("alchemyName");
+
+        const createUserForm =
+            document.getElementById("createUserForm");
+
+        const createButton =
+            document.getElementById("createButton");
+
+        const message =
+            document.getElementById("message");
+
+        /*
+         * Ye frontend convenience check hai.
+         * Actual security backend ke SecurityConfig me enforce hoti hai.
+         */
+        if (role !== "ADMIN") {
+            window.location.href = "/alchemy/index.html";
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+
+            const adminName =
+                document.getElementById("adminName");
+
+            if (name) {
+                adminName.innerText = name;
+            }
+        });
+
+        createUserForm.addEventListener("submit", createUser);
+
+        async function createUser(event) {
+
+            event.preventDefault();
+
+            const data = {
+                name: document.getElementById("name").value.trim(),
+                email: document.getElementById("email").value.trim(),
+                password: document.getElementById("password").value,
+                role: document.getElementById("role").value
+            };
+
+            message.innerText = "";
+            message.className = "auth-message";
+
+            createButton.disabled = true;
+            createButton.innerText = "Creating...";
+
+            try {
+
+                const response =
+                    await fetch("/alchemy/api/admin/create-user", {
+
+                        method: "POST",
+
+                        // Browser HttpOnly JWT cookie automatically bhejega
+                        credentials: "include",
+
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+
+                        body: JSON.stringify(data)
+                    });
+
+                if (response.status === 401) {
+                    window.location.href = "/alchemy/login.html";
+                    return;
+                }
+
+                if (response.status === 403) {
+
+                    message.innerText =
+                        "Only an administrator can create accounts.";
+
+                    message.className = "auth-message error";
+
+                    return;
+                }
+
+                const result = await response.text();
+
+                if (!response.ok) {
+
+                    message.innerText =
+                        result || "Unable to create account.";
+
+                    message.className = "auth-message error";
+
+                    return;
+                }
+
+                message.innerText = result;
+                message.className = "auth-message success";
+
+                clearForm();
+
+            } catch (error) {
+
+                console.error("Create user error:", error);
+
+                message.innerText =
+                    "Unable to connect to the Alchemy server.";
+
+                message.className = "auth-message error";
+
+            } finally {
+
+                createButton.disabled = false;
+                createButton.innerText = "Create Account";
+            }
+        }
+
+        function clearForm() {
+
+            document.getElementById("name").value = "";
+            document.getElementById("email").value = "";
+            document.getElementById("password").value = "";
+            document.getElementById("role").value = "USER";
+        }
+
+        function backToChatbot() {
+            window.location.href = "/alchemy/index.html";
+        }
+
+        async function logout() {
+
+            try {
+
+                await fetch("/alchemy/api/auth/logout", {
+                    method: "POST",
+                    credentials: "include"
+                });
+
+            } catch (error) {
+                console.error("Logout error:", error);
+            }
+
+            localStorage.removeItem("alchemyName");
+            localStorage.removeItem("alchemyRole");
+
+            window.location.href = "/alchemy/login.html";
+        }
+
+    </script>
+
+</body>
+
+</html>
